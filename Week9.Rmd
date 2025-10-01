@@ -1,0 +1,192 @@
+---
+title: "Week_9"
+author: "Nicholas Koppert"
+date: "2025-10-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Week 9: Working with sequence data in R
+Introduction: We will be doing...
+-Download sequence files, unzip them and read them into R.
+-Perform simple manipulations and analyses with sequence data.
+-Use provided functions to calculate amino acid and nucleotide frequency.
+-Use provided functions to calculate codon usage bias.
+-Use provided tools to calculate protein sequence k-mer frequency.
+```{r loading packages}
+suppressPackageStartupMessages({
+library ("seqinr") # is a package designed to process and analyse sequence data.
+library ("R.utils") # general utilities like zip and unzip
+})
+```
+##Loading E.coli sequence data
+
+We will be downloading E. coli genomic sequence data from Ensembl . Ensembl is one of the biggest databases of genomic data. There are many E. coli strains available in Ensembl, but we will focus today on “Escherichia coli str. K-12 substr.MG1655 str. K12 (GCA_000005845)”.
+
+This code first loads the R.utils library, which is used to decompress files. It then defines the URL for a compressed FASTA file containing Escherichia coli coding sequences, downloads the file as ecoli_cds.fa.gz, decompresses it using gunzip, and finally lists the files in the current directory to confirm the successful download and extraction.
+
+HAD to # the gunzip command. Why?
+```{r downloading E.coli Genome}
+library("R.utils")
+URL="http://ftp.ensemblgenomes.org/pub/bacteria/release-53/fasta/bacteria_0_collection/escherichia_coli_str_k_12_substr_mg1655_gca_000005845/cds/Escherichia_coli_str_k_12_substr_mg1655_gca_000005845.ASM584v2.cds.all.fa.gz"
+download.file(URL,destfile="ecoli_cds.fa.gz")
+# gunzip("ecoli_cds.fa.gz")
+list.files()
+```
+
+Load the seqinr library: This library provides tools for biological sequence retrieval and analysis.
+
+```{r}
+library("seqinr")
+```
+##Reading the fasta file
+The code below reads the uncompressed FASTA file ecoli_cds.fa containing Escherichia coli coding sequences into R using the read.fasta function from the seqinr package. The str(head(cds)) function then provides a structured summary of the first few sequences, giving an overview of the data's structure and content.
+
+In this output each sequence is identified by a code (e.g., AAC73112) and stored as a character vector of nucleotides (A, T, G, C). The name attribute gives the sequence ID, and the Annot attribute provides additional information, such as the sequence's location on the chromosome and the associated gene. The sequences vary in length, reflecting different gene sizes.
+```{r}
+cds <- seqinr::read.fasta("ecoli_cds.fa")
+str(head(cds))
+```
+##Basic sequence analysis
+Now we can figure out the number of coding sequences.
+```{r}
+length(cds)
+```
+The summary(cds) function generates a detailed summary of the sequences, including their lengths, classes, and modes, while head limits the output to the initial entries.
+```{r}
+head(summary(cds))
+```
+Now let's determine the total length of our sequence. The code below extracts the lengths of genes from the cds object by converting the first column of the summary to numeric values. It then calculates the total length of all genes by summing these values. TOTAL length of DNA in the E.coli genome...
+
+Then calculates mean & median.
+```{r}
+len <- as.numeric(summary(cds)[,1])
+sum(len)
+mean(len)
+median(len)
+```
+Histogram: We can look at the distribution of coding sequence length with different types of plots.
+This code plots a histogram of gene lengths, with xlab and ylab for axis labels and main for the title.
+
+Box plot:This code creates a boxplot of gene lengths, labeling the y-axis as "sequence length (bp)."
+```{r}
+hist(len,xlab="sequence length (bp)",ylab="frequency",main="histogram of coding sequence length")
+boxplot(len,ylab="sequence length (bp)")
+```
+##Sequence composition: composition of DNA sequences
+First with one sequence, then with the whole set of coding sequences.
+
+use ?GC ?count and ?summary to see the documentation for those seqinr commands.
+
+cds is a list containing multiple sequences. To access a specific element within a list, such as the first sequence, we use double square brackets ([[ ]]). This syntax retrieves the actual sequence object from the list. For example, cds[[1]] extracts the first sequence from the cds list. We can then pass this to the GC function to compute its GC content.
+```{r}
+GC(cds[[1]])
+```
+Let's count the number of each nucleotide present in this gene.
+count(cds[[1]],1) # to count the number of each nucleotide present in gene 1
+
+count(cds[[1]],2) # We can also calculate the occurrence of two-nucleotide combinations in our first gene.
+
+E.g., to go to gene 2, put 2 in the first box. The last box represents (number)-nucleotide combinations. This is also how to find MOTIFS... the different combinations and the numbers of them.
+```{r}
+count(cds[[2]],3)
+```
+If you want to count the total length or compute the GC content of a specific number of genes from a list, you will need to unlist them first. For instance, length(unlist(cds[1:3])) extracts the first three sequences from the cds list, converts them into a single character vector using unlist, and then calculates the total length of this combined vector.
+
+length(unlist(cds[1:3]))
+
+And if you want to measure the GC content of these three genes you wrap it with GC function instead of length
+
+GC(unlist(cds[1:3]))
+
+Code below is for: length and GC content of the WHOLE GENOME
+```{r}
+length(unlist(cds))
+GC(unlist(cds))
+```
+If we want to analyze the nucleotide composition of a DNA sequence, we first need to unlist the cds, store it in the dna variable and then calculate the frequency of each nucleotide using dna_composition <- count(dna, 1), which stores these frequencies in dna_composition. 
+
+We then visualize this data with barplot(dna_composition, xlab="nucleotides", ylab="frequency", main="E coli CDS composition"). This creates a bar plot where the x-axis represents the nucleotides (A, C, G, T), the y-axis shows their frequencies, and the plot title indicates that it displays the nucleotide composition of E. coli coding sequences.
+```{r}
+dna <- unlist(cds)
+dna_composition <- count(dna,1)
+barplot(dna_composition,xlab="nucleotides",ylab="frequency", main="E coli CDS composition")
+```
+If we want to calculate the relative frequencies of each nucleotide in a DNA sequence, we first count the number of each nucleotide using dna_composition <- count(dna, 1). To find the relative frequencies, we divide each nucleotide count by the total number of nucleotides using dna_composition / sum(dna_composition). This step transforms the raw counts into proportions, showing the frequency of each nucleotide as a fraction of the total, which helps in understanding the distribution of nucleotides within the sequence.
+```{r}
+dna_composition/sum(dna_composition)
+```
+We can also plot of our nucleotide frequencies by using the following code
+
+**note first line is added
+```{r}
+dna_proportion <- dna_composition / sum(dna_composition)
+barplot(dna_proportion,xlab="nucleotides",ylab="proportion", main="E coli CDS composition")
+grid()
+```
+##Translation
+Now perform similar analysis for protein sequences. First, we need to translate the sequences. For example, the code below will translate your first CDS
+```{r}
+translate(cds[[1]])
+```
+Although we have not learned loops in R, we will have to use a for loop if we want to translate all the cds sequences in our genome. The good news is that for loops work almost similar to what we learned in bash.
+
+In the code below, prot <- list() initializes an empty list to store the translated sequences. The for loop, for (i in seq_along(cds)) { prot[[i]] <- translate(cds[[i]]) }, iterates over each sequence in cds using indices generated by seq_along(cds), applies the translate function to each sequence, and stores the resulting translated sequence in the corresponding position in the prot list.
+```{r}
+prot <- list()
+for (i in seq_along(cds)) 
+    {prot[[i]] <- translate(cds[[i]]) }
+```
+You might find it a bit more complex than the bash we used before. Luckily, R has another way of performing loops with apply functions. (use over previous!)
+
+In the code, lapply applies the translate function to each element of the cds list, resulting in prot, a list of translated protein sequences.
+```{r}
+prot <- lapply(cds, translate)
+```
+We can use the prot list to get any useful information, such as the number of unique amino acids. aa <- unique(prot[[2]]) extracts these amino acids, aa <- aa[aa != "*"] removes any asterisks for unknown amino acids, and length(aa) counts the remaining unique amino acids.
+```{r}
+aa <- unique(prot[[2]])
+aa <- aa[aa != "*"]
+length(aa)
+```
+Let's determine the frequency of each amino acid in our first gene. This code counts the occurrences of each amino acid in the first sequence of the prot list, using aa as the set of possible amino acids. 
+```{r}
+count(prot[[1]],wordsize=1,alphabet=aa)
+```
+And for the second gene
+```{r}
+count(prot[[2]],wordsize=1,alphabet=aa)
+```
+##Codon usage
+A codon is a three base triplet that codes for a particular amino acid. As there are 64 possible codons and just 20 amino acids (and 3 termination codons), some amino acids are coded by multiple codons. For example, leucine is coded by six codons.
+
+seqinr has a command called uco which calculates some codon usage information.
+
+Let’s have a look at how it can calculate codon usage for a single protein sequence.
+
+The function uco(cds[[2]]) returns the unique codons used in the second sequence of the cds list.
+```{r}
+uco(cds[[2]])
+```
+What if you wanted to calculate synonymous codons? A synonymous codon is a codon that codes for the same amino acids. The code below computes the Relative Synonymous Codon Usage (RSCU) values for the codons in the second sequence 
+
+The RSCU stands for relative synonymous codon usage, which is a measure as to how preferred a codon of a particular amino acid is compared to the other codons which also encode it. A value of 1 indicating that the codon is used as expected. Values above 1 suggest that the codon is used more frequently than expected, while values below 1 indicate lower usage. For instance, codons like "aaa" and "att" show higher RSCU values, indicating they are used more often, whereas codons like "tga" and "tag" have lower values, suggesting less frequent use.
+
+```{r}
+uco(cds[[2]],index="rscu")
+```
+If want to get these values in a data frame we can use the option as.data.frame=True
+```{r}
+uco(cds[[2]],index="rscu",as.data.frame=TRUE)
+```
+##Kmer profiling
+K-mer is simply a short sequence string of length k. We can use k-mer analysis to identify particular sequences that are over- or under-represented in an organism.
+```{r}
+prots <- unlist(prot)
+mycounts <- count(prots,wordsize=3,alphabet=aa)
+str(mycounts)
+head(mycounts)
+myfreq <- count(prots,wordsize=3,alphabet=aa,freq=TRUE)
+```
