@@ -8,7 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-## Week 9: Working with sequence data in R
+# Week 9: Working with sequence data in R
 Introduction: We will be doing...
 -Download sequence files, unzip them and read them into R.
 -Perform simple manipulations and analyses with sequence data.
@@ -21,7 +21,7 @@ library ("seqinr") # is a package designed to process and analyse sequence data.
 library ("R.utils") # general utilities like zip and unzip
 })
 ```
-##Loading E.coli sequence data
+## Loading E.coli sequence data
 
 We will be downloading E. coli genomic sequence data from Ensembl . Ensembl is one of the biggest databases of genomic data. There are many E. coli strains available in Ensembl, but we will focus today on “Escherichia coli str. K-12 substr.MG1655 str. K12 (GCA_000005845)”.
 
@@ -41,7 +41,7 @@ Load the seqinr library: This library provides tools for biological sequence ret
 ```{r}
 library("seqinr")
 ```
-##Reading the fasta file
+## Reading the fasta file
 The code below reads the uncompressed FASTA file ecoli_cds.fa containing Escherichia coli coding sequences into R using the read.fasta function from the seqinr package. The str(head(cds)) function then provides a structured summary of the first few sequences, giving an overview of the data's structure and content.
 
 In this output each sequence is identified by a code (e.g., AAC73112) and stored as a character vector of nucleotides (A, T, G, C). The name attribute gives the sequence ID, and the Annot attribute provides additional information, such as the sequence's location on the chromosome and the associated gene. The sequences vary in length, reflecting different gene sizes.
@@ -49,7 +49,7 @@ In this output each sequence is identified by a code (e.g., AAC73112) and stored
 cds <- seqinr::read.fasta("ecoli_cds.fa")
 str(head(cds))
 ```
-##Basic sequence analysis
+## Basic sequence analysis
 Now we can figure out the number of coding sequences.
 ```{r}
 length(cds)
@@ -75,7 +75,7 @@ Box plot:This code creates a boxplot of gene lengths, labeling the y-axis as "se
 hist(len,xlab="sequence length (bp)",ylab="frequency",main="histogram of coding sequence length")
 boxplot(len,ylab="sequence length (bp)")
 ```
-##Sequence composition: composition of DNA sequences
+## Sequence composition: composition of DNA sequences
 First with one sequence, then with the whole set of coding sequences.
 
 use ?GC ?count and ?summary to see the documentation for those seqinr commands.
@@ -126,7 +126,7 @@ dna_proportion <- dna_composition / sum(dna_composition)
 barplot(dna_proportion,xlab="nucleotides",ylab="proportion", main="E coli CDS composition")
 grid()
 ```
-##Translation
+## Translation
 Now perform similar analysis for protein sequences. First, we need to translate the sequences. For example, the code below will translate your first CDS
 ```{r}
 translate(cds[[1]])
@@ -159,7 +159,7 @@ And for the second gene
 ```{r}
 count(prot[[2]],wordsize=1,alphabet=aa)
 ```
-##Codon usage
+## Codon usage
 A codon is a three base triplet that codes for a particular amino acid. As there are 64 possible codons and just 20 amino acids (and 3 termination codons), some amino acids are coded by multiple codons. For example, leucine is coded by six codons.
 
 seqinr has a command called uco which calculates some codon usage information.
@@ -181,7 +181,7 @@ If want to get these values in a data frame we can use the option as.data.frame=
 ```{r}
 uco(cds[[2]],index="rscu",as.data.frame=TRUE)
 ```
-##Kmer profiling
+## Kmer profiling
 K-mer is simply a short sequence string of length k. We can use k-mer analysis to identify particular sequences that are over- or under-represented in an organism.
 ```{r}
 prots <- unlist(prot)
