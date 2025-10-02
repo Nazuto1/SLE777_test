@@ -1,0 +1,166 @@
+---
+title: "DESeq2 Analysis"
+author: "Nicholas Koppert"
+date: "2025-10-02"
+output: html_document
+---
+
+## 2. Introduction to DESeq2
+Overview of Differential Expression Analysis:
+Before we delve into DESeq2, let's understand what differential expression analysis is. This process helps us identify genes that are expressed differently between two or more conditions, such as healthy vs. diseased cells or treated vs. untreated cells. By pinpointing these genes, we can gain insights into biological processes and diseases.
+
+Introduction to DESeq2 Package in R:
+DESeq2 is a powerful tool in R specifically designed for analyzing RNA-seq data. It provides methods for normalizing raw count data, estimating dispersion, and testing for differential expression. Its robust statistical algorithms make it one of the most widely used packages for this purpose.
+
+## 3. How to get help for DESeq2
+To seek assistance with DESeq2, you can post your question to the Bioconductor support site, which is also searchable knowledge base:
+
+https://support.bioconductor.org
+
+When posting a question, ensure to tag it with "DESeq2" to trigger an alert for the package authors to address it on the support platform.
+
+## 4. Importing and Preprocessing Data
+Input data:
+The DESeq2 package needs count data from experiments like RNA-seq. This data should be in a matrix format with whole numbers. Each row of the matrix shows how many reads are linked to a gene in a sample. These values shouldn't be normalized and should represent the actual counts of sequencing reads or fragments.
+
+Create a new R project
+Before starting our analysis, it’s a good idea to set up an R project. This helps keep your files organized. When you create a new R project, you can choose to use version control with Git, which helps track changes to your files and makes collaboration easier. If you don’t need version control, you can skip that option. Setting up an R project also makes sure that R knows the correct working directory, so you don’t have to set it manually each time.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Importing HTSeq Count Data:
+We will be working with the yeast RNAseq data that we worked on in the first part of our classes. Our data is typically stored in count folder in the home/shared directory, which contain raw counts of reads mapped to each gene. We'll specify the directory path where these count files are located using the directory variable. 
+
+```{r}
+directory <- "/home/shared/counts"
+```
+
+Next, we'll use the list.files() function to list all the files in the directory, and then store count files names in the sampleFiles variable
+
+```{r}
+sampleFiles <- list.files(directory)
+```
+
+## 5. Creating a sample table
+Now that we have our count files, we need to create a sample table that tells DESeq2 which samples correspond to which conditions. We'll manually define the conditions for each sample.
+
+```{r}
+sampleCondition <- c('10Days','10Days', '10Days', '45Days','45Days', '45Days')
+```
+Now we make a sampleTable by creating a data frame that includes the sample names, file names, and experimental conditions for each sample. The sampleName and fileName columns both come from the sampleFiles list, while the condition column uses the sampleCondition variable. Finally, we convert the condition column into a factor, which is useful for statistical analysis in R.
+```{r}
+sampleNames <- gsub("\\.txt$", "", basename(sampleFiles)) 
+sampleTable <- data.frame(sampleName = sampleNames,
+                          fileName = sampleFiles,
+                          condition = sampleCondition)
+sampleTable$condition <- factor(sampleTable$condition)
+```
+We can have a look at the sampleTable that we have just created by typing its name
+```{r}
+sampleTable 
+```
+Now, let's load the DESeq2 library and create a count matrix. The DESeqDataSetFromHTSeqCount() function creates a DESeqDataSet object named ddsHTSeq using the count data from HTSeq. This function requires three arguments: sampleTable, which contains information about each sample; directory, specifying the location of the count files; and design, which defines the experimental design for modeling the conditions.
+```{r}
+library("DESeq2")
+ddsHTSeq <- DESeqDataSetFromHTSeqCount(sampleTable = sampleTable,
+directory = directory,
+design = ~ condition)
+```
+## 6. Filtering Low-Count Genes
+While it's not obligatory to pre-filter genes with low counts before using DESeq2 functions, pre-filtering has two advantages. First, it reduces the memory size of the dds data object by removing rows with very few reads. Second, it speeds up count modeling within DESeq2. Additionally, pre-filtering can enhance visualizations because features lacking differential expression information won't be plotted in dispersion plots or MA-plots.
+
+For pre-filtering, we keep only rows with a count of at least 10 in a minimal number of samples. Choosing 10 as the count threshold is reasonable for bulk RNA-seq. 
+```{r}
+keep <- rowSums(counts(ddsHTSeq)) >= 10
+```
+The code below filters the ddsHTSeq dataset to include only rows (genes) that meet the condition specified in keep. This subsetted dataset, dds, now contains only those genes with counts greater than or equal to the threshold set earlier.
+```{r}
+dds <- ddsHTSeq[keep,]
+```
+## 7. Differential Expression Analysis
+## Setting the Reference Level:
+Before running DESeq analysis, it's important to set a reference level for our conditions. This reference level serves as a baseline for comparison with other conditions. R typically selects a reference level for factors in alphabetical order by default. Consequently, if you don't specify which level to compare against in DESeq2 functions, the comparisons will rely on the alphabetical order of the levels. In our case, we'll set the reference level to "10Days", which represents the control condition. 
+```{r}
+dds$condition <- relevel(dds$condition, ref = "10Days")
+```
+## Running DDESeq Analysis
+With our data prepared and the reference level set, we can now run DESeq analysis to identify differentially expressed genes between conditions. We'll use the DESeq() function, which will perform data normalization and performs statistical tests to determine significance.
+```{r}
+ddsDE <- DESeq(dds)
+```
+## Exploring Differential Expression Results:
+After running DESeq analysis, we can explore the results to identify genes that are differentially expressed between conditions. The code res <- results(ddsDE) generates the results of the differential expression analysis from the ddsDE dataset. This function computes and returns a table with information on differential gene expression, including log fold changes, p-values, and adjusted p-values for each gene. 
+```{r}
+res <- results(ddsDE)
+head(res)
+```
+We can then use the summary() function to obtain a summary of the differentially expressed genes, including statistics such as log2 fold change and adjusted p-values.
+```{r}
+summary(res)
+```
+We can sort the results by adjusted p-value using res <- res[order(res$padj),], which arranges them from the smallest to largest p-value. head(res) then displays the top entries from this sorted list.
+```{r}
+res <- res[order(res$padj),]
+head(res)
+```
+You can also check how many of your genes are significantly up- or down-regulated by specifying the alpha and log fold change (LFC) thresholds.  
+
+Alpha (α) represents the significance level in statistical tests, typically set at 0.05. It defines the threshold for rejecting the null hypothesis, meaning that any gene with a p-value below 0.05 is considered significantly differentially expressed. However, in high-throughput experiments like RNA-seq, multiple testing correction is necessary, which is where the p-adjusted value (also known as false discovery rate or FDR) comes in. The p-adjusted value accounts for the multiple comparisons being made, helping to control for false positives. A gene is considered significant if its p-adjusted value is below the specified alpha level.
+
+The log fold change (LFC) refers to the logarithmic ratio of expression between two conditions. It quantifies how much a gene's expression level changes, with positive values indicating upregulation and negative values indicating downregulation. The lfcThreshold parameter allows you to set a minimum threshold, ensuring that only genes with substantial changes in expression are considered.
+
+In this example below, genes are filtered by an alpha of 0.05 (adjusted for multiple testing) and a log fold change threshold of 1, meaning only genes with at least a two-fold change in expression are considered.
+```{r}
+ressigni <- results(ddsDE, alpha = 0.05, lfcThreshold = 1)
+summary(ressigni)
+```
+## 8. Plot counts
+
+We can plot the expression levels of our favorite gene across different experimental conditions using the code below. This code generates a plot showing how the counts for the specified gene.
+```{r}
+plotCounts(dds, gene="YDR070C")
+```
+## Volcano plots
+We can also plot all our data in a volcano plot to visualize significance and effect size. The initial code generates a basic plot of log2 fold changes versus -log10 p-values. We then add colored points: blue for genes with an adjusted p-value below 0.01, and red for those with both an adjusted p-value below 0.05 and a log2 fold change greater than 2. This highlights the most significant changes in our dataset.
+```{r}
+# Create the volcano plot
+with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot", xlim=c(-3, 3)))
+
+# Add blue points for padj < 0.01
+with(subset(res, padj < 0.01), points(log2FoldChange, -log10(pvalue), pch=20, col="blue"))
+
+# Add red points for padj < 0.05 and |log2FC| > 2 (log2FC > 2 or log2FC < -2)
+with(subset(res, padj < 0.05 & (log2FoldChange > 2 | log2FoldChange < -2)),
+     points(log2FoldChange, -log10(pvalue), pch=20, col="red"))
+```
+## PCA plot
+A PCA plot (Principal Component Analysis plot) is a graphical representation that helps visualize the patterns and relationships within high-dimensional data. By reducing the dimensions of the data to its principal components, a PCA plot displays the most important variance in the data. Points on the plot represent samples, and their positions reveal clusters or trends based on the principal components, making it easier to identify underlying structures and groupings.
+
+The code below performs variance stabilization on the count data from a DESeq2 object (dds). This transformation stabilizes the variance across different levels of expression, making the data more suitable for visualization and comparison. The blind=FALSE argument ensures that the transformation takes into account the experimental design, rather than ignoring it. 
+```{r}
+vsdata <- varianceStabilizingTransformation(dds, blind=FALSE)
+```
+Now we can use the plotPCA function to make a PCA plot
+```{r}
+plotPCA(vsdata)
+```
+## 9. Exporting results to CSV files
+You can export the results as a plain-text file using the basic R functions write.csv.
+```{r}
+write.csv(as.data.frame(res), 
+          file="condition_treated_results.csv")
+```
+You can export only the results that meet an adjusted p-value threshold by using the subset function followed by the write.csv function.
+```{r}
+# Order results by adjusted p-value
+resOrdered <- res[order(res$padj), ]
+resSig <- subset(resOrdered, padj < 0.1)
+resSig
+```
+## 10. Session information
+Includes details of the R environment and package versions used for this analysis
+```{r}
+sessionInfo()
+```
